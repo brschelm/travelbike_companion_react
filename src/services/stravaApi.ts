@@ -9,10 +9,10 @@ export class StravaAPI {
 
   constructor() {
     // Hardcoded values for Docker compatibility
-    // Updated for production deployment
+    // Updated for production deployment - using primary domain
     this.clientId = '164470';
     this.clientSecret = '93fca6adc86e9d6b93be27d6499551465ffb33e6';
-    this.redirectUri = 'https://travelbike-companion-react-dr4otdhpp.vercel.app/strava-callback';
+    this.redirectUri = 'https://travelbike-companion-react.vercel.app/strava-callback';
     this.baseUrl = 'https://www.strava.com/api/v3';
     this.tokenUrl = 'https://www.strava.com/oauth/token';
   }
