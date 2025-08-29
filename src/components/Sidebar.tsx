@@ -1,12 +1,16 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useStrava } from '../contexts/StravaContext';
 import {
   MapIcon,
   ChartBarIcon,
   CogIcon,
   AcademicCapIcon,
-  CloudArrowUpIcon
+  CloudArrowUpIcon,
+  ClipboardDocumentListIcon,
+  HeartIcon,
+  CloudIcon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
@@ -20,6 +24,9 @@ const navigation = [
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
+  const { isConnected, connectToStrava } = useStrava();
+
+
 
   return (
     <motion.div
@@ -50,6 +57,33 @@ const Sidebar: React.FC = () => {
             );
           })}
         </nav>
+
+        {/* Sekcja połączeń */}
+        <div className="mt-8 pt-6 border-t border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Połączenie</h3>
+          
+          {/* Strava */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                <span className="text-sm text-gray-600">Strava</span>
+              </div>
+              {!isConnected && (
+                <button
+                  onClick={connectToStrava}
+                  className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors duration-200"
+                >
+                  Połącz
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+
+
+
       </div>
     </motion.div>
   );

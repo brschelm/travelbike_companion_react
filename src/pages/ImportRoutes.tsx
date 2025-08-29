@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useStrava } from '../contexts/StravaContext';
 import { motion } from 'framer-motion';
-import { CloudArrowUpIcon, MapIcon, ChartBarIcon } from '@heroicons/react/24/outline';
+import { CloudArrowUpIcon, MapIcon, ChartBarIcon, TruckIcon, UserIcon, FireIcon } from '@heroicons/react/24/outline';
+import { formatActivityType } from '../utils/activityUtils';
+import { ACTIVITY_CATEGORIES } from '../types';
 
 const ImportRoutes: React.FC = () => {
-  const { isConnected, connectToStrava, activities } = useStrava();
+  const { isConnected, connectToStrava, categorizedActivities } = useStrava();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -12,6 +14,13 @@ const ImportRoutes: React.FC = () => {
     if (file && file.type === 'application/gpx+xml') {
       setUploadedFile(file);
     }
+  };
+
+  // Grupuj aktywności według kategorii
+  const categoryCounts = {
+    cycling: categorizedActivities.filter(activity => activity.category === ACTIVITY_CATEGORIES.CYCLING).length,
+    running: categorizedActivities.filter(activity => activity.category === ACTIVITY_CATEGORIES.RUNNING).length,
+    other: categorizedActivities.filter(activity => activity.category === ACTIVITY_CATEGORIES.OTHER).length
   };
 
   return (
@@ -45,8 +54,24 @@ const ImportRoutes: React.FC = () => {
                   <span className="text-sm text-green-600">Połączono</span>
                 </div>
                 <p className="text-sm text-gray-500">
-                  {activities.length} aktywności załadowanych
+                  {categorizedActivities.length} aktywności załadowanych
                 </p>
+                
+                {/* Category breakdown */}
+                <div className="text-xs text-gray-500 space-y-1">
+                  <div className="flex items-center justify-center space-x-2">
+                                         <TruckIcon className="w-3 h-3 text-blue-600" />
+                     <span>{categoryCounts.cycling} rowerowe</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2">
+                                         <UserIcon className="w-3 h-3 text-green-600" />
+                     <span>{categoryCounts.running} biegowe</span>
+                  </div>
+                  <div className="flex items-center justify-center space-x-2">
+                    <FireIcon className="w-3 h-3 text-orange-600" />
+                    <span>{categoryCounts.other} inne</span>
+                  </div>
+                </div>
               </div>
             ) : (
               <button
@@ -111,7 +136,7 @@ const ImportRoutes: React.FC = () => {
       </div>
 
       {/* Recent Activities Preview */}
-      {isConnected && activities.length > 0 && (
+      {isConnected && categorizedActivities.length > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -119,17 +144,36 @@ const ImportRoutes: React.FC = () => {
         >
           <h3 className="text-xl font-semibold text-gray-900 mb-4">Ostatnie aktywności ze Strava</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activities.slice(0, 6).map((activity, index) => (
+            {categorizedActivities.slice(0, 6).map((activity, index) => (
               <div key={index} className="p-4 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-900">
-                  {new Date(activity.start_date).toLocaleDateString('pl-PL')}
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-medium text-gray-900">
+                    {new Date(activity.start_date_local || activity.start_date).toLocaleDateString('pl-PL')}
+                  </p>
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    activity.category === ACTIVITY_CATEGORIES.CYCLING 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : activity.category === ACTIVITY_CATEGORIES.RUNNING 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-orange-100 text-orange-800'
+                  }`}>
+                    {formatActivityType(activity.type)}
+                  </div>
+                </div>
                 <p className="text-sm text-gray-600">
                   Dystans: {(activity.distance / 1000).toFixed(1)} km
                 </p>
                 <p className="text-sm text-gray-600">
                   Czas: {Math.round(activity.moving_time / 60)} min
                 </p>
+                <p className="text-sm text-gray-600">
+                  Prędkość: {((activity.distance / 1000) / (activity.moving_time / 3600)).toFixed(1)} km/h
+                </p>
+                {activity.category === ACTIVITY_CATEGORIES.RUNNING && (
+                  <p className="text-sm text-gray-600">
+                    Tempo: {(60 / ((activity.distance / 1000) / (activity.moving_time / 3600))).toFixed(1)} min/km
+                  </p>
+                )}
               </div>
             ))}
           </div>

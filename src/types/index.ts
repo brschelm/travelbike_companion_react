@@ -6,6 +6,8 @@ export interface StravaToken {
   expires_in: number;
 }
 
+
+
 export interface StravaActivity {
   id: number;
   name: string;
@@ -32,6 +34,58 @@ export interface StravaActivity {
   map?: {
     summary_polyline: string;
   };
+}
+
+// Activity Type Constants
+export const ACTIVITY_TYPES = {
+  RIDE: 'Ride',
+  RUN: 'Run',
+  WALK: 'Walk',
+  SWIM: 'Swim',
+  HIKE: 'Hike',
+  YOGA: 'Yoga',
+  WORKOUT: 'Workout',
+  ALPINE_SKI: 'AlpineSki',
+  BACKCOUNTRY_SKI: 'BackcountrySki',
+  CANOEING: 'Canoeing',
+  CROSSFIT: 'Crossfit',
+  ELLIPTICAL: 'Elliptical',
+  GOLF: 'Golf',
+  HANDCYCLE: 'Handcycle',
+  ICE_SKATE: 'IceSkate',
+  INLINE_SKATE: 'InlineSkate',
+  KAYAKING: 'Kayaking',
+  KETTLEBELL: 'Kettlebell',
+  NORDIC_SKI: 'NordicSki',
+  ROCK_CLIMBING: 'RockClimbing',
+  ROLLER_SKI: 'RollerSki',
+  ROWING: 'Rowing',
+  SNOWBOARD: 'Snowboard',
+  SNOWSHOE: 'Snowshoe',
+  STAIR_STEPPER: 'StairStepper',
+  STANDUP_PADDLING: 'StandUpPaddling',
+  SURFING: 'Surfing',
+  VELOMOBILE: 'Velomobile',
+  WEIGHT_TRAINING: 'WeightTraining',
+  WHEELCHAIR: 'Wheelchair'
+} as const;
+
+export type ActivityType = typeof ACTIVITY_TYPES[keyof typeof ACTIVITY_TYPES];
+
+// Activity Category
+export const ACTIVITY_CATEGORIES = {
+  CYCLING: 'cycling',
+  RUNNING: 'running',
+  OTHER: 'other'
+} as const;
+
+export type ActivityCategory = typeof ACTIVITY_CATEGORIES[keyof typeof ACTIVITY_CATEGORIES];
+
+// Extended Activity with category
+export interface CategorizedActivity extends StravaActivity {
+  category: ActivityCategory;
+  isCycling: boolean;
+  isRunning: boolean;
 }
 
 export interface StravaAthlete {
@@ -109,5 +163,32 @@ export interface AppSettings {
   units: 'metric' | 'imperial';
   theme: 'light' | 'dark';
   language: 'pl' | 'en';
+}
+
+// Training Zones Types
+export interface HeartRateZones {
+  zone1: { min: number; max: number; name: string; description: string };
+  zone2: { min: number; max: number; name: string; description: string };
+  zone3: { min: number; max: number; name: string; description: string };
+  zone4: { min: number; max: number; name: string; description: string };
+  zone5: { min: number; max: number; name: string; description: string };
+}
+
+export interface TrainingZoneAnalysis {
+  totalTime: number;
+  zone1Time: number;
+  zone2Time: number;
+  zone3Time: number;
+  zone4Time: number;
+  zone5Time: number;
+  zone2Percentage: number;
+  recommendations: string[];
+}
+
+export interface UserProfile {
+  age: number;
+  maxHeartRate?: number;
+  restingHeartRate?: number;
+  lactateThreshold?: number;
 }
 

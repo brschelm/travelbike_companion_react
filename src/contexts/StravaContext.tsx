@@ -1,13 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { StravaAPI } from '../services/stravaApi';
-import { StravaToken, StravaActivity } from '../types';
+import { StravaToken, StravaActivity, CategorizedActivity } from '../types';
+import { categorizeActivity } from '../utils/activityUtils';
 
 interface StravaContextType {
   isConnected: boolean;
   activities: StravaActivity[];
+  categorizedActivities: CategorizedActivity[];
+  cyclingActivities: StravaActivity[];
+  runningActivities: StravaActivity[];
+  otherActivities: StravaActivity[];
   connectToStrava: () => void;
   disconnectFromStrava: () => void;
   refreshActivities: () => Promise<void>;
+  refreshCyclingActivities: () => Promise<void>;
+  refreshRunningActivities: () => Promise<void>;
   loading: boolean;
 }
 
@@ -31,6 +38,39 @@ export const StravaProvider: React.FC<StravaProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [stravaApi] = useState(() => new StravaAPI());
 
+  // Kategoryzuj aktywności automatycznie
+  const categorizedActivities = useMemo(() => {
+    return activities.map(activity => categorizeActivity(activity));
+  }, [activities]);
+
+  // Filtruj aktywności według typu
+  const cyclingActivities = useMemo(() => {
+    return activities.filter(activity => 
+      activity.type === 'Ride' || 
+      activity.type === 'VirtualRide' || 
+      activity.type === 'EBikeRide'
+    );
+  }, [activities]);
+
+  const runningActivities = useMemo(() => {
+    return activities.filter(activity => 
+      activity.type === 'Run' || 
+      activity.type === 'VirtualRun' || 
+      activity.type === 'TrailRun'
+    );
+  }, [activities]);
+
+  const otherActivities = useMemo(() => {
+    return activities.filter(activity => 
+      activity.type !== 'Ride' && 
+      activity.type !== 'VirtualRide' && 
+      activity.type !== 'EBikeRide' &&
+      activity.type !== 'Run' && 
+      activity.type !== 'VirtualRun' && 
+      activity.type !== 'TrailRun'
+    );
+  }, [activities]);
+
   const refreshActivities = useCallback(async () => {
     if (!isConnected) return;
     
@@ -39,11 +79,67 @@ export const StravaProvider: React.FC<StravaProviderProps> = ({ children }) => {
       const tokenData = localStorage.getItem('strava_token');
       if (tokenData) {
         const token: StravaToken = JSON.parse(tokenData);
-        const activitiesData = await stravaApi.getActivities(token.access_token);
+        const activitiesData = await stravaApi.getActivities(token.access_token, 200);
         setActivities(activitiesData);
       }
     } catch (error) {
       console.error('Error fetching activities:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [isConnected, stravaApi]);
+
+  // NOWA METODA: Pobierz tylko aktywności rowerowe
+  const refreshCyclingActivities = useCallback(async () => {
+    if (!isConnected) return;
+    
+    setLoading(true);
+    try {
+      const tokenData = localStorage.getItem('strava_token');
+      if (tokenData) {
+        const token: StravaToken = JSON.parse(tokenData);
+        const cyclingData = await stravaApi.getCyclingActivities(token.access_token, 200);
+        
+        // Aktualizuj główną listę aktywności
+        setActivities(prev => {
+          const nonCycling = prev.filter(activity => 
+            activity.type !== 'Ride' && 
+            activity.type !== 'VirtualRide' && 
+            activity.type !== 'EBikeRide'
+          );
+          return [...cyclingData, ...nonCycling];
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching cycling activities:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [isConnected, stravaApi]);
+
+  // NOWA METODA: Pobierz tylko aktywności biegowe
+  const refreshRunningActivities = useCallback(async () => {
+    if (!isConnected) return;
+    
+    setLoading(true);
+    try {
+      const tokenData = localStorage.getItem('strava_token');
+      if (tokenData) {
+        const token: StravaToken = JSON.parse(tokenData);
+        const runningData = await stravaApi.getRunningActivities(token.access_token, 200);
+        
+        // Aktualizuj główną listę aktywności
+        setActivities(prev => {
+          const nonRunning = prev.filter(activity => 
+            activity.type !== 'Run' && 
+            activity.type !== 'VirtualRun' && 
+            activity.type !== 'TrailRun'
+          );
+          return [...runningData, ...nonRunning];
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching running activities:', error);
     } finally {
       setLoading(false);
     }
@@ -82,9 +178,15 @@ export const StravaProvider: React.FC<StravaProviderProps> = ({ children }) => {
   const value: StravaContextType = {
     isConnected,
     activities,
+    categorizedActivities,
+    cyclingActivities,
+    runningActivities,
+    otherActivities,
     connectToStrava,
     disconnectFromStrava,
     refreshActivities,
+    refreshCyclingActivities,
+    refreshRunningActivities,
     loading
   };
 

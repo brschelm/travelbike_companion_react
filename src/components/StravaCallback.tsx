@@ -12,36 +12,62 @@ const StravaCallback: React.FC = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        console.log('=== STRAVA CALLBACK DEBUG ===');
+        console.log('URL:', window.location.href);
+        console.log('Search params:', window.location.search);
+        
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
 
+        console.log('Code:', code);
+        console.log('Error:', error);
+
         if (error) {
+          console.error('Strava error:', error);
           setError('Authorization was denied');
           setStatus('error');
           return;
         }
 
         if (!code) {
+          console.error('No code received');
           setError('No authorization code received');
           setStatus('error');
           return;
         }
 
+        console.log('Attempting to exchange code for token...');
+        
         // Exchange code for token
         const tokenData: StravaToken = await stravaApi.getToken(code);
         
+        console.log('Token received:', tokenData);
+        
         // Store token in localStorage
         localStorage.setItem('strava_token', JSON.stringify(tokenData));
+        console.log('Token stored in localStorage');
         
         setStatus('success');
         
         // Force page reload to update StravaContext
-        window.location.href = '/';
+        // Sprawdź czy jesteśmy na localhost czy na produkcji
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          console.log('Redirecting to localhost...');
+          window.location.href = 'http://localhost:3000/';
+        } else {
+          console.log('Redirecting to production...');
+          window.location.href = '/';
+        }
 
-      } catch (err) {
+      } catch (err: any) {
+        console.error('=== STRAVA CALLBACK ERROR ===');
         console.error('Error handling Strava callback:', err);
-        setError('Failed to complete authorization');
+        console.error('Error type:', typeof err);
+        console.error('Error message:', err?.message);
+        console.error('Error stack:', err?.stack);
+        
+        setError(`Failed to complete authorization: ${err?.message || 'Unknown error'}`);
         setStatus('error');
       }
     };

@@ -1,11 +1,11 @@
-# TravelBike Companion - React Application
+# Fitness Tracker - React Application
 
-Aplikacja rowerowa zintegrowana ze Strava, przekształcona z Streamlit na React.
+Aplikacja fitness zintegrowana ze Strava, przekształcona z Streamlit na React.
 
 ## Funkcje
 
 - 🔗 Integracja ze Strava API
-- 📊 Analiza aktywności rowerowych
+- 📊 Analiza aktywności fitness (rowery, bieganie, spacer, nordic walking)
 - 📈 Statystyki i wykresy
 - 🎯 Śledzenie celów treningowych
 - 📍 Import tras GPX

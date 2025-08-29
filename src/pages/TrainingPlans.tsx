@@ -2,10 +2,12 @@ import React, { useState, useMemo } from 'react';
 import { useStrava } from '../contexts/StravaContext';
 import { useGoals } from '../contexts/GoalsContext';
 import { motion } from 'framer-motion';
-import { AcademicCapIcon, TrophyIcon, FireIcon } from '@heroicons/react/24/outline';
+import { AcademicCapIcon, TrophyIcon, FireIcon, TruckIcon, UserIcon } from '@heroicons/react/24/outline';
+import { calculateCategoryStats } from '../utils/activityUtils';
+import { ACTIVITY_CATEGORIES } from '../types';
 
 const TrainingPlans: React.FC = () => {
-  const { activities, isConnected } = useStrava();
+  const { categorizedActivities, isConnected } = useStrava();
   const { goals, addGoal, deleteGoal, markAsAchieved } = useGoals();
   const [showGoalForm, setShowGoalForm] = useState(false);
   const [newGoal, setNewGoal] = useState({
@@ -15,20 +17,26 @@ const TrainingPlans: React.FC = () => {
   });
 
   const stats = useMemo(() => {
-    if (!activities.length) return null;
+    if (!categorizedActivities.length) return null;
 
-    const activitiesWithDates = activities.map(activity => ({
-      ...activity,
-      start_date: new Date(activity.start_date),
-      distance_km: activity.distance / 1000,
-      moving_time_hours: activity.moving_time / 3600,
-      avg_speed: (activity.distance / 1000) / (activity.moving_time / 3600)
-    }));
+    const activitiesWithDates = categorizedActivities.map(activity => {
+      const avg_speed = activity.moving_time > 0 ? (activity.distance / 1000) / (activity.moving_time / 3600) : 0;
+      
+
+      
+      return {
+        ...activity,
+        start_date: new Date(activity.start_date),
+        distance_km: activity.distance / 1000,
+        moving_time_hours: activity.moving_time / 3600,
+        avg_speed: avg_speed
+      };
+    });
 
     const totalDistance = activitiesWithDates.reduce((sum, activity) => sum + activity.distance_km, 0);
-    const avgDistancePerRide = totalDistance / activities.length;
-    const avgSpeed = activitiesWithDates.reduce((sum, activity) => sum + activity.avg_speed, 0) / activities.length;
-    const longestRide = Math.max(...activitiesWithDates.map(activity => activity.distance_km));
+    const avgDistancePerActivity = totalDistance / categorizedActivities.length;
+    const avgSpeed = activitiesWithDates.reduce((sum, activity) => sum + activity.avg_speed, 0) / categorizedActivities.length;
+    const longestActivity = Math.max(...activitiesWithDates.map(activity => activity.distance_km));
 
     // Weekly average
     const weeklyDistance = activitiesWithDates.reduce((acc: any[], activity) => {
@@ -45,14 +53,22 @@ const TrainingPlans: React.FC = () => {
 
     const avgWeeklyDistance = weeklyDistance.reduce((sum, week) => sum + week.distance, 0) / Math.max(weeklyDistance.length, 1);
 
+    // Statystyki kategorii
+    const categoryStats = {
+      cycling: calculateCategoryStats(categorizedActivities, ACTIVITY_CATEGORIES.CYCLING),
+      running: calculateCategoryStats(categorizedActivities, ACTIVITY_CATEGORIES.RUNNING),
+      other: calculateCategoryStats(categorizedActivities, ACTIVITY_CATEGORIES.OTHER)
+    };
+
     return {
       totalDistance,
-      avgDistancePerRide,
+      avgDistancePerActivity,
       avgSpeed,
-      longestRide,
-      avgWeeklyDistance
+      longestActivity,
+      avgWeeklyDistance,
+      categoryStats
     };
-  }, [activities]);
+  }, [categorizedActivities]);
 
   const handleSubmitGoal = (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +107,22 @@ const TrainingPlans: React.FC = () => {
     );
   }
 
+  if (!stats) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="text-center py-12"
+      >
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md mx-auto">
+          <AcademicCapIcon className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-blue-800 mb-2">Brak danych</h3>
+          <p className="text-blue-700">Nie masz jeszcze żadnych aktywności. Dodaj aktywności ze Strava, aby zobaczyć plany treningowe.</p>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -100,6 +132,112 @@ const TrainingPlans: React.FC = () => {
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">Plany Treningowe</h1>
         <p className="text-lg text-gray-600">Ustaw cele i otrzymuj spersonalizowane rekomendacje treningowe</p>
+      </div>
+
+      {/* Category Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Cycling Stats */}
+        <motion.div
+          whileHover={{ y: -5 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                             <TruckIcon className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Rower</h3>
+              <p className="text-sm text-gray-600">Statystyki rowerowe</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Aktywności:</span>
+                             <span className="font-semibold">{stats.categoryStats?.cycling?.count || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Dystans:</span>
+                             <span className="font-semibold">{(stats.categoryStats?.cycling?.totalDistance || 0).toFixed(1)} km</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Prędkość:</span>
+                             <span className="font-semibold">{(stats.categoryStats?.cycling?.averageSpeed || 0).toFixed(1)} km/h</span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Running Stats */}
+        <motion.div
+          whileHover={{ y: -5 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                             <UserIcon className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Bieg</h3>
+              <p className="text-sm text-gray-600">Statystyki biegowe</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Aktywności:</span>
+                             <span className="font-semibold">{stats.categoryStats?.running?.count || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Dystans:</span>
+                             <span className="font-semibold">{(stats.categoryStats?.running?.totalDistance || 0).toFixed(1)} km</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Czas:</span>
+                             <span className="font-semibold">{(stats.categoryStats?.running?.totalTime || 0).toFixed(1)} h</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Prędkość:</span>
+                             <span className="font-semibold">{(stats.categoryStats?.running?.averageSpeed || 0).toFixed(1)} km/h</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Tempo (min/km):</span>
+              <span className="font-semibold">
+                {stats.categoryStats?.running?.averageSpeed > 0 
+                  ? (60 / (stats.categoryStats?.running?.averageSpeed || 1)).toFixed(1)
+                  : '0.0'
+                }
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Other Stats */}
+        <motion.div
+          whileHover={{ y: -5 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <FireIcon className="w-6 h-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Inne</h3>
+              <p className="text-sm text-gray-600">Pozostałe aktywności</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Aktywności:</span>
+                             <span className="font-semibold">{stats.categoryStats?.other?.count || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Dystans:</span>
+                             <span className="font-semibold">{(stats.categoryStats?.other?.totalDistance || 0).toFixed(1)} km</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Prędkość:</span>
+                             <span className="font-semibold">{(stats.categoryStats?.other?.averageSpeed || 0).toFixed(1)} km/h</span>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
       {/* Current Stats Overview */}
@@ -112,16 +250,16 @@ const TrainingPlans: React.FC = () => {
               <p className="text-2xl font-bold text-blue-600">{stats.totalDistance.toFixed(1)} km</p>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <p className="text-sm text-gray-600">Średni dystans/przejazd</p>
-              <p className="text-2xl font-bold text-green-600">{stats.avgDistancePerRide.toFixed(1)} km</p>
+              <p className="text-sm text-gray-600">Średni dystans/aktywność</p>
+              <p className="text-2xl font-bold text-green-600">{stats.avgDistancePerActivity.toFixed(1)} km</p>
             </div>
             <div className="text-center p-4 bg-purple-50 rounded-lg">
               <p className="text-sm text-gray-600">Średnia prędkość</p>
               <p className="text-2xl font-bold text-purple-600">{stats.avgSpeed.toFixed(1)} km/h</p>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <p className="text-sm text-gray-600">Najdłuższy przejazd</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.longestRide.toFixed(1)} km</p>
+              <p className="text-sm text-gray-600">Najdłuższa aktywność</p>
+              <p className="text-2xl font-bold text-orange-600">{stats.longestActivity.toFixed(1)} km</p>
             </div>
           </div>
         </div>
@@ -136,63 +274,108 @@ const TrainingPlans: React.FC = () => {
           >
             <h3 className="text-lg font-semibold text-gray-900 mb-4">💡 Sugestie planów treningowych</h3>
             <div className="space-y-4">
-              {stats.longestRide < 50 ? (
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    🎯 <strong>Cel dystansu:</strong> Twój najdłuższy przejazd to {stats.longestRide.toFixed(1)} km. 
-                    Spróbuj osiągnąć <strong>50 km</strong> w jednym przejeździe!
-                  </p>
+              {/* Cycling recommendations */}
+              {(stats.categoryStats?.cycling?.count || 0) > 0 && (
+                <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                  <h4 className="font-medium text-blue-800 mb-2">🚴‍♂️ Rekomendacje rowerowe:</h4>
+                  {(stats.categoryStats?.cycling?.averageSpeed || 0) < 15 ? (
+                    <p className="text-sm text-blue-700">
+                      Popraw średnią prędkość do <strong>15 km/h</strong> na dystansie 10-20 km.
+                    </p>
+                  ) : (stats.categoryStats?.cycling?.averageSpeed || 0) < 20 ? (
+                    <p className="text-sm text-blue-700">
+                      Celuj w <strong>20 km/h</strong> na dłuższych dystansach!
+                    </p>
+                  ) : (
+                    <p className="text-sm text-blue-700">
+                                              Świetna prędkość! Utrzymuj {(stats.categoryStats?.cycling?.averageSpeed || 0).toFixed(1)} km/h.
+                    </p>
+                  )}
                 </div>
-              ) : stats.longestRide < 75 ? (
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-800">
-                    🚀 <strong>Cel dystansu:</strong> Świetnie! Spróbuj osiągnąć <strong>75 km</strong> w jednym przejeździe!
-                  </p>
+              )}
+
+              {/* Running recommendations */}
+              {(stats.categoryStats?.running?.count || 0) > 0 && (
+                <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
+                  <h4 className="font-medium text-green-800 mb-2">🏃‍♂️ Rekomendacje biegowe:</h4>
+                  {(stats.categoryStats?.running?.averageSpeed || 0) < 8 ? (
+                    <p className="text-sm text-green-700">
+                      Popraw średnią prędkość do <strong>8 km/h</strong> na dystansie 5-10 km.
+                      <br />
+                      <span className="text-xs text-green-600">
+                        Celuj w tempo: <strong>{(60/8).toFixed(1)} min/km</strong>
+                      </span>
+                    </p>
+                  ) : (stats.categoryStats?.running?.averageSpeed || 0) < 10 ? (
+                    <p className="text-sm text-green-700">
+                      Celuj w <strong>10 km/h</strong> na dłuższych dystansach!
+                      <br />
+                      <span className="text-xs text-green-600">
+                        Celuj w tempo: <strong>{(60/10).toFixed(1)} min/km</strong>
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-sm text-green-700">
+                                              Świetna prędkość! Utrzymuj {(stats.categoryStats?.running?.averageSpeed || 0).toFixed(1)} km/h.
+                      <br />
+                      <span className="text-xs text-green-600">
+                                                  Twoje tempo: <strong>{(60/(stats.categoryStats?.running?.averageSpeed || 1)).toFixed(1)} min/km</strong>
+                      </span>
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-purple-800">
-                    🏆 <strong>Cel dystansu:</strong> Niesamowicie! Spróbuj osiągnąć <strong>100 km</strong> w jednym przejeździe!
+              )}
+
+              {/* Training zones recommendation */}
+              {(stats.categoryStats?.running?.count || 0) > 0 && (
+                <div className="p-3 bg-indigo-50 rounded-lg border-l-4 border-indigo-400">
+                  <h4 className="font-medium text-indigo-800 mb-2">💓 Strefy treningowe:</h4>
+                  <p className="text-sm text-indigo-700">
+                    Sprawdź czy Twoje treningi biegowe były w strefie 2 (60-70% max HR) 
+                    na stronie "Strefy treningowe" - to klucz do poprawy wydolności!
                   </p>
                 </div>
               )}
 
-              {stats.avgWeeklyDistance < 30 ? (
-                <div className="p-3 bg-yellow-50 rounded-lg">
+              {/* General distance recommendations */}
+              {stats?.longestActivity < 50 ? (
+                <div className="p-3 bg-yellow-50 rounded-lg border-l-4 border-yellow-400">
                   <p className="text-sm text-yellow-800">
+                    🎯 <strong>Cel dystansu:</strong> Twoja najdłuższa aktywność to {stats?.longestActivity?.toFixed(1) || 0} km. 
+                    Spróbuj osiągnąć <strong>50 km</strong> w jednej aktywności!
+                  </p>
+                </div>
+              ) : stats?.longestActivity < 75 ? (
+                <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
+                  <p className="text-sm text-green-800">
+                    🚀 <strong>Cel dystansu:</strong> Świetnie! Spróbuj osiągnąć <strong>75 km</strong> w jednej aktywności!
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-purple-50 rounded-lg border-l-4 border-purple-400">
+                  <p className="text-sm text-purple-800">
+                    🏆 <strong>Cel dystansu:</strong> Niesamowicie! Spróbuj osiągnąć <strong>100 km</strong> w jednej aktywności!
+                  </p>
+                </div>
+              )}
+
+              {/* Weekly recommendations */}
+              {stats?.avgWeeklyDistance < 30 ? (
+                <div className="p-3 bg-indigo-50 rounded-lg border-l-4 border-indigo-400">
+                  <p className="text-sm text-indigo-800">
                     📈 <strong>Cel tygodniowy:</strong> Zwiększ swoją tygodniową aktywność do <strong>30 km</strong>.
                   </p>
                 </div>
-              ) : stats.avgWeeklyDistance < 50 ? (
-                <div className="p-3 bg-blue-50 rounded-lg">
+              ) : stats?.avgWeeklyDistance < 50 ? (
+                <div className="p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400">
                   <p className="text-sm text-blue-800">
                     💪 <strong>Cel tygodniowy:</strong> Jesteś na dobrej drodze! Spróbuj osiągnąć <strong>50 km</strong> tygodniowo.
                   </p>
                 </div>
               ) : (
-                <div className="p-3 bg-green-50 rounded-lg">
+                <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
                   <p className="text-sm text-green-800">
                     🎉 <strong>Cel tygodniowy:</strong> Twoje tygodniowe treningi są imponujące! Utrzymuj to tempo.
-                  </p>
-                </div>
-              )}
-
-              {stats.avgSpeed < 15 ? (
-                <div className="p-3 bg-indigo-50 rounded-lg">
-                  <p className="text-sm text-indigo-800">
-                    ⚡ <strong>Cel prędkości:</strong> Popraw średnią prędkość do <strong>15 km/h</strong> na dystansie 10-20 km.
-                  </p>
-                </div>
-              ) : stats.avgSpeed < 20 ? (
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <p className="text-sm text-purple-800">
-                    🚴‍♂️ <strong>Cel prędkości:</strong> Celuj w <strong>20 km/h</strong> na dłuższych dystansach!
-                  </p>
-                </div>
-              ) : (
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <p className="text-sm text-green-800">
-                    🏅 <strong>Cel prędkości:</strong> Świetna prędkość! Utrzymuj {stats.avgSpeed.toFixed(1)} km/h lub zwiększ ją jeszcze bardziej.
                   </p>
                 </div>
               )}
@@ -207,19 +390,41 @@ const TrainingPlans: React.FC = () => {
             <div className="space-y-4">
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-700">
-                  <strong>Średni tygodniowy dystans:</strong> {stats.avgWeeklyDistance.toFixed(1)} km
+                  <strong>Średni tygodniowy dystans:</strong> {stats?.avgWeeklyDistance?.toFixed(1) || 0} km
                 </p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-700">
-                  <strong>Liczba aktywnych tygodni:</strong> {activities.length > 0 ? Math.ceil(activities.length / 3) : 0}
+                  <strong>Liczba aktywnych tygodni:</strong> {categorizedActivities.length > 0 ? Math.ceil(categorizedActivities.length / 3) : 0}
                 </p>
               </div>
               <div className="p-3 bg-gray-50 rounded-lg">
                 <p className="text-sm text-gray-700">
-                  <strong>Trend aktywności:</strong> {stats.avgWeeklyDistance > 25 ? '↗️ Rosnący' : '→ Stabilny'}
+                  <strong>Trend aktywności:</strong> {stats?.avgWeeklyDistance > 25 ? '↗️ Rosnący' : '→ Stabilny'}
                 </p>
               </div>
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-700">
+                  <strong>Dominująca aktywność:</strong> {
+                    (stats.categoryStats?.cycling?.count || 0) > (stats.categoryStats?.running?.count || 0) && (stats.categoryStats?.cycling?.count || 0) > (stats.categoryStats?.other?.count || 0)
+                      ? '🚴‍♂️ Rower'
+                      : (stats.categoryStats?.running?.count || 0) > (stats.categoryStats?.other?.count || 0)
+                      ? '🏃‍♂️ Bieg'
+                      : '🔥 Inne'
+                  }
+                </p>
+              </div>
+              {(stats.categoryStats?.running?.count || 0) > 0 && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    <strong>Średnie tempo biegu:</strong> {
+                      (stats.categoryStats?.running?.averageSpeed || 0) > 0 
+                        ? `${(60/(stats.categoryStats?.running?.averageSpeed || 1)).toFixed(1)} min/km`
+                        : 'Brak danych'
+                    }
+                  </p>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

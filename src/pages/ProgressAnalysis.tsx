@@ -1,16 +1,25 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useStrava } from '../contexts/StravaContext';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
-import { ChartBarIcon, CalendarIcon, AcademicCapIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, CalendarIcon, AcademicCapIcon, TruckIcon, UserIcon, FireIcon } from '@heroicons/react/24/outline';
+import { calculateCategoryStats, filterActivitiesByCategory } from '../utils/activityUtils';
+import { ACTIVITY_CATEGORIES } from '../types';
 
 const ProgressAnalysis: React.FC = () => {
-  const { activities, isConnected } = useStrava();
+  const { categorizedActivities, isConnected } = useStrava();
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const progressData = useMemo(() => {
-    if (!activities.length) return null;
+    if (!categorizedActivities.length) return null;
 
-    const activitiesWithDates = activities.map(activity => ({
+    // Filtruj aktywności według wybranej kategorii
+    let filteredActivities = categorizedActivities;
+    if (selectedCategory !== 'all') {
+      filteredActivities = filterActivitiesByCategory(categorizedActivities, selectedCategory as any);
+    }
+
+    const activitiesWithDates = filteredActivities.map(activity => ({
       ...activity,
       start_date: new Date(activity.start_date),
       distance_km: activity.distance / 1000,
@@ -72,12 +81,21 @@ const ProgressAnalysis: React.FC = () => {
         (progressData.filter((_, index) => index > 0 && progressData[index].distance >= progressData[index - 1].distance * 0.8).length / (progressData.length - 1) * 100).toFixed(1) : 0
     };
 
+    // Statystyki kategorii
+    const categoryStats = {
+      cycling: calculateCategoryStats(categorizedActivities, ACTIVITY_CATEGORIES.CYCLING),
+      running: calculateCategoryStats(categorizedActivities, ACTIVITY_CATEGORIES.RUNNING),
+      other: calculateCategoryStats(categorizedActivities, ACTIVITY_CATEGORIES.OTHER)
+    };
+
     return {
       progressData,
       monthlyProgress: monthlyProgress.sort((a, b) => a.month.localeCompare(b.month)),
-      improvementTrends
+      improvementTrends,
+      categoryStats,
+      filteredActivities: activitiesWithDates
     };
-  }, [activities]);
+  }, [categorizedActivities, selectedCategory]);
 
   if (!isConnected) {
     return (
@@ -111,7 +129,16 @@ const ProgressAnalysis: React.FC = () => {
     );
   }
 
-  const { progressData: data, monthlyProgress, improvementTrends } = progressData;
+  const { progressData: data, monthlyProgress, improvementTrends, categoryStats, filteredActivities } = progressData;
+
+  const getCategoryName = (category: string) => {
+    switch (category) {
+      case ACTIVITY_CATEGORIES.CYCLING: return 'Rower';
+      case ACTIVITY_CATEGORIES.RUNNING: return 'Bieg';
+      case ACTIVITY_CATEGORIES.OTHER: return 'Inne';
+      default: return 'Wszystkie';
+    }
+  };
 
   return (
     <motion.div
@@ -121,7 +148,143 @@ const ProgressAnalysis: React.FC = () => {
     >
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-4">Analiza postępów</h1>
-        <p className="text-lg text-gray-600">Śledź swój rozwój i postępy w treningach rowerowych</p>
+        <p className="text-lg text-gray-600">Śledź swój rozwój i postępy w treningach rowerowych, biegowych i innych</p>
+      </div>
+
+      {/* Category Filter */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Wybierz kategorię aktywności do analizy
+        </label>
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="all">Wszystkie kategorie</option>
+          <option value={ACTIVITY_CATEGORIES.CYCLING}>Rower</option>
+          <option value={ACTIVITY_CATEGORIES.RUNNING}>Bieg</option>
+          <option value={ACTIVITY_CATEGORIES.OTHER}>Inne</option>
+        </select>
+        {selectedCategory !== 'all' && (
+          <p className="text-sm text-gray-500 mt-2">
+            Analizujesz postępy dla kategorii: <span className="font-semibold">{getCategoryName(selectedCategory)}</span>
+          </p>
+        )}
+      </div>
+
+      {/* Category Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Cycling Stats */}
+        <motion.div
+          whileHover={{ y: -5 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                             <TruckIcon className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Rower</h3>
+              <p className="text-sm text-gray-600">Postępy rowerowe</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Aktywności:</span>
+                             <span className="font-semibold">{categoryStats?.cycling?.count || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Dystans:</span>
+                             <span className="font-semibold">{(categoryStats?.cycling?.totalDistance || 0).toFixed(1)} km</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Czas:</span>
+                             <span className="font-semibold">{(categoryStats?.cycling?.totalTime || 0).toFixed(1)} h</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Prędkość:</span>
+                             <span className="font-semibold">{(categoryStats?.cycling?.averageSpeed || 0).toFixed(1)} km/h</span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Running Stats */}
+        <motion.div
+          whileHover={{ y: -5 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                             <UserIcon className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Bieg</h3>
+              <p className="text-sm text-gray-600">Postępy biegowe</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Aktywności:</span>
+                             <span className="font-semibold">{categoryStats?.running?.count || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Dystans:</span>
+                             <span className="font-semibold">{(categoryStats?.running?.totalDistance || 0).toFixed(1)} km</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Czas:</span>
+                             <span className="font-semibold">{(categoryStats?.running?.totalTime || 0).toFixed(1)} h</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Prędkość:</span>
+                             <span className="font-semibold">{(categoryStats?.running?.averageSpeed || 0).toFixed(1)} km/h</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Tempo (min/km):</span>
+                             <span className="font-semibold">
+                 {(categoryStats?.running?.averageSpeed || 0) > 0
+                   ? (60 / (categoryStats?.running?.averageSpeed || 1)).toFixed(1)
+                   : '0.0'
+                 }
+               </span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Other Stats */}
+        <motion.div
+          whileHover={{ y: -5 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="flex items-center mb-4">
+            <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+              <FireIcon className="w-6 h-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <h3 className="text-lg font-semibold text-gray-900">Inne</h3>
+              <p className="text-sm text-gray-600">Pozostałe aktywności</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Aktywności:</span>
+                             <span className="font-semibold">{categoryStats?.other?.count || 0}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Dystans:</span>
+                             <span className="font-semibold">{(categoryStats?.other?.totalDistance || 0).toFixed(1)} km</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Czas:</span>
+                             <span className="font-semibold">{(categoryStats?.other?.totalTime || 0).toFixed(1)} h</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Prędkość:</span>
+                             <span className="font-semibold">{(categoryStats?.other?.averageSpeed || 0).toFixed(1)} km/h</span>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
       {/* Progress Overview Cards */}
@@ -135,7 +298,10 @@ const ProgressAnalysis: React.FC = () => {
               <ChartBarIcon className="w-6 h-6 text-blue-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Łączny postęp</p>
+              <p className="text-sm font-medium text-gray-600">
+                Łączny postęp
+                {selectedCategory !== 'all' && ` (${getCategoryName(selectedCategory)})`}
+              </p>
               <p className="text-2xl font-bold text-gray-900">{data[data.length - 1]?.cumulativeDistance.toFixed(1)} km</p>
             </div>
           </div>
@@ -180,7 +346,10 @@ const ProgressAnalysis: React.FC = () => {
               <CalendarIcon className="w-6 h-6 text-orange-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Liczba treningów</p>
+              <p className="text-sm font-medium text-gray-600">
+                Liczba treningów
+                {selectedCategory !== 'all' && ` (${getCategoryName(selectedCategory)})`}
+              </p>
               <p className="text-2xl font-bold text-gray-900">{data.length}</p>
             </div>
           </div>
@@ -189,7 +358,10 @@ const ProgressAnalysis: React.FC = () => {
 
       {/* Cumulative Progress Chart */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Kumulatywny postęp dystansu</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">
+          Kumulatywny postęp dystansu
+          {selectedCategory !== 'all' && ` - ${getCategoryName(selectedCategory)}`}
+        </h3>
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -203,7 +375,10 @@ const ProgressAnalysis: React.FC = () => {
 
       {/* Monthly Progress Comparison */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Porównanie miesięczne</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">
+          Porównanie miesięczne
+          {selectedCategory !== 'all' && ` - ${getCategoryName(selectedCategory)}`}
+        </h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={monthlyProgress}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -211,14 +386,17 @@ const ProgressAnalysis: React.FC = () => {
             <YAxis />
             <Tooltip />
             <Bar dataKey="totalDistance" fill="#10B981" name="Dystans (km)" />
-            <Bar dataKey="rideCount" fill="#8B5CF6" name="Liczba przejazdów" />
+            <Bar dataKey="rideCount" fill="#8B5CF6" name="Liczba aktywności" />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Individual Ride Progress */}
+      {/* Individual Activity Progress */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Postęp pojedynczych przejazdów</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">
+          Postęp pojedynczych aktywności
+          {selectedCategory !== 'all' && ` - ${getCategoryName(selectedCategory)}`}
+        </h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -257,6 +435,17 @@ const ProgressAnalysis: React.FC = () => {
                 {improvementTrends.consistencyScore}% regularnych treningów
               </span>
             </div>
+            {(categoryStats?.running?.count || 0) > 0 && (
+              <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                <span className="text-gray-700">Średnie tempo biegu</span>
+                <span className="font-semibold text-green-600">
+                  {(categoryStats?.running?.averageSpeed || 0) > 0 
+                    ? `${(60/(categoryStats?.running?.averageSpeed || 1)).toFixed(1)} min/km`
+                    : 'Brak danych'
+                  }
+                </span>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -296,12 +485,73 @@ const ProgressAnalysis: React.FC = () => {
 
             <div className="p-3 bg-indigo-50 rounded-lg">
               <p className="text-sm text-indigo-800">
-                🔄 Następny cel: {Math.round(data[data.length - 1]?.distance * 1.1)} km w jednym przejeździe
+                🔄 Następny cel: {Math.round(data[data.length - 1]?.distance * 1.1)} km w jednej aktywności
               </p>
             </div>
+            {(categoryStats?.running?.count || 0) > 0 && (
+              <div className="p-3 bg-green-50 rounded-lg">
+                <p className="text-sm text-green-800">
+                  🏃‍♂️ <strong>Cel tempa biegu:</strong> {
+                    (categoryStats?.running?.averageSpeed || 0) > 0 
+                      ? `Popraw tempo z ${(60/(categoryStats?.running?.averageSpeed || 1)).toFixed(1)} min/km do ${Math.max((60/(categoryStats?.running?.averageSpeed || 1) * 0.9), 4).toFixed(1)} min/km`
+                      : 'Ustaw cel tempa biegu'
+                  }
+                </p>
+              </div>
+            )}
+
+            {/* Training zones recommendation */}
+            {(categoryStats?.running?.count || 0) > 0 && (
+              <div className="p-3 bg-indigo-50 rounded-lg">
+                <p className="text-sm text-indigo-800">
+                  💓 <strong>Strefy treningowe:</strong> Sprawdź czy biegałeś w strefie 2 
+                  (60-70% max HR) na stronie "Strefy treningowe" - to klucz do poprawy wydolności!
+                </p>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
+
+                 {/* Running recommendations */}
+           {(categoryStats?.running?.count || 0) > 0 && (
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">🏃‍♂️ Rekomendacje biegowe</h3>
+          <div className="space-y-3">
+                             {(categoryStats?.running?.averageSpeed || 0) < 8 ? (
+              <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
+                <p className="text-sm text-green-700">
+                  Popraw średnią prędkość do <strong>8 km/h</strong> na dystansie 5-10 km.
+                  <br />
+                  <span className="text-xs text-green-600">
+                    Celuj w tempo: <strong>{(60/8).toFixed(1)} min/km</strong>
+                  </span>
+                </p>
+              </div>
+                           ) : (categoryStats?.running?.averageSpeed || 0) < 10 ? (
+              <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
+                <p className="text-sm text-green-700">
+                  Celuj w <strong>10 km/h</strong> na dłuższych dystansach!
+                  <br />
+                  <span className="text-xs text-green-600">
+                    Celuj w tempo: <strong>{(60/10).toFixed(1)} min/km</strong>
+                  </span>
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 bg-green-50 rounded-lg border-l-4 border-green-400">
+                <p className="text-sm text-green-700">
+                                     Świetna prędkość! Utrzymuj {(categoryStats?.running?.averageSpeed || 0).toFixed(1)} km/h.
+                  <br />
+                  <span className="text-xs text-green-600">
+                                         Twoje tempo: <strong>{(60/(categoryStats?.running?.averageSpeed || 1)).toFixed(1)} min/km</strong>
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
