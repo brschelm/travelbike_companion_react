@@ -12,6 +12,7 @@ import TrainingPlans from './pages/TrainingPlans';
 import TrainingZones from './pages/TrainingZones';
 import Settings from './pages/Settings';
 import StravaCallback from './components/StravaCallback';
+import GoogleFitCallback from './components/GoogleFitCallback';
 
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
                   <Route path="/training-zones" element={<TrainingZones />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route path="/strava-callback" element={<StravaCallback />} />
+                  <Route path="/google-fit-callback" element={<GoogleFitCallback />} />
                 </Routes>
               </main>
             </div>

@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStrava } from '../contexts/StravaContext';
 import { motion } from 'framer-motion';
-import { CloudArrowUpIcon, MapIcon, ChartBarIcon, TruckIcon, UserIcon, FireIcon } from '@heroicons/react/24/outline';
+import { CloudArrowUpIcon, MapIcon, ChartBarIcon, TruckIcon, UserIcon, FireIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
 import { formatActivityType } from '../utils/activityUtils';
 import { ACTIVITY_CATEGORIES } from '../types';
+import GoogleFitApi from '../services/googleFitApi';
 
 const ImportRoutes: React.FC = () => {
   const { isConnected, connectToStrava, categorizedActivities } = useStrava();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isGoogleFitConnected, setIsGoogleFitConnected] = useState<boolean>(false);
+
+  const connectToGoogleFit = () => {
+    const googleFitApi = new GoogleFitApi();
+    const authUrl = googleFitApi.getAuthUrl();
+    window.location.href = authUrl;
+  };
+
+  // Sprawdź czy użytkownik jest połączony z Google Fit
+  useEffect(() => {
+    const googleFitToken = localStorage.getItem('googleFitToken');
+    if (googleFitToken) {
+      setIsGoogleFitConnected(true);
+    }
+  }, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -79,6 +95,39 @@ const ImportRoutes: React.FC = () => {
                 className="w-full bg-orange-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-orange-700 transition-colors duration-200"
               >
                 Połącz ze Strava
+              </button>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Google Fit Card */}
+        <motion.div
+          whileHover={{ y: -5 }}
+          className="bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+        >
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <DevicePhoneMobileIcon className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Google Fit</h3>
+            <p className="text-gray-600 mb-4">Połącz się z Google Fit</p>
+            
+            {isGoogleFitConnected ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-center space-x-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm text-green-600">Połączono</span>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Dane z Google Fit załadowane
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={connectToGoogleFit}
+                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors duration-200"
+              >
+                Połącz z Google Fit
               </button>
             )}
           </div>
